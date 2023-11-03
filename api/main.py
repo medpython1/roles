@@ -75,7 +75,8 @@ def get_current_admin(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Not enough permissions")
     return current_user
 def get_current_hr_access(current_user: User = Depends(get_current_user)):
-    if not current_user.Active_Status == "Active" and current_user.department=="Manager":
+    if not (current_user.Active_Status == "Active" and current_user.department == "Hr" and current_user.roles == "Manager"):
+
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
