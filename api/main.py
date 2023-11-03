@@ -74,7 +74,10 @@ def get_current_admin(current_user: User = Depends(get_current_user)):
     if  current_user.roles == "admin" and current_user.department not in ["It","Hr"]:
         raise HTTPException(status_code=400, detail="Not enough permissions")
     return current_user
-
+def get_current_hr_access(current_user: User = Depends(get_current_user)):
+    if not current_user.Active_Status == "Active" and current_user.department=="Manager":
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
 
 @app.post("/token")
 async def login(from_data: OAuth2PasswordRequestForm = Depends()):
@@ -103,7 +106,7 @@ async def signup(me: UserCreate):
     user.save()
     return {"message": "User created successfully"}
 @app.get("/get_data")
-def getting_data(current_user: User = Depends(get_current_active_user)):
+def getting_data(current_user: User = Depends(get_current_hr_access)):
     gett_user=User.objects().to_json()
     bey=json.loads(gett_user)
     return bey
