@@ -110,4 +110,6 @@ async def signup(me: UserCreate):
 def getting_data(current_user: User = Depends(get_current_hr_access)):
     gett_user=User.objects().to_json()
     bey=json.loads(gett_user)
-    return bey
+    if bey:
+        data=[{"Email":data["email"],"Department":data["department"]} for data in bey]
+    return data
