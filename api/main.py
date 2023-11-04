@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException,Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -6,6 +6,10 @@ import jwt
 from mongoengine import *
 import json
 from starlette.responses import JSONResponse
+from fastapi import File, UploadFile, HTTPException
+from typing import List
+import base64
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 connect(db="Role", host="13.51.159.230", port=27017)
@@ -20,11 +24,16 @@ class UserCreate(BaseModel):
     password:str
     roles:str
     department:str
+class VideoClip(Document):
+    sno=IntField()
+    base64_data = StringField(required=True)
+    isuue_type=StringField(required=True)
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+app.mount("/videos_clip", StaticFiles(directory="./api/videos_clip"), name="videos_clip")
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -75,8 +84,7 @@ def get_current_admin(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Not enough permissions")
     return current_user
 def get_current_hr_access(current_user: User = Depends(get_current_user)):
-    if not (current_user.Active_Status == "Active" and current_user.department == "Hr" and current_user.roles == "Manager"):
-
+    if not (current_user.Active_Status == "Active" and (current_user.department == "Hr" or current_user.department=="It") and current_user.roles == "Manager"):
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
@@ -113,3 +121,39 @@ def getting_data(current_user: User = Depends(get_current_hr_access)):
     if bey:
         data=[{"Email":data["email"],"Department":data["department"]} for data in bey]
     return data
+
+class VideoClipResponse(BaseModel):
+    base64_data: str
+@app.post("/upload/")
+async def upload_video_clip(file: UploadFile = File(...),issue_type:str=File(...)):
+    content = await file.read()
+    base64_data = base64.b64encode(content).decode('utf-8')
+    video_clip = VideoClip(sno=VideoClip.objects.count()+1,base64_data=base64_data,isuue_type=issue_type)
+    video_clip.save()
+    return {"message": "Video clip uploaded successfully."}
+import os
+
+VIDEO_CLIPS_FOLDER = "video_clips"
+
+@app.get("/video_clips/")
+async def get_video_clips(sno:int,request: Request):
+    video_clips = VideoClip.objects(sno=sno)
+    if video_clips:
+        saved_clips = []
+        # Create the folder if it doesn't exist
+        for clip in video_clips:
+            # Decode Base64 data and save it as a video file
+            video_data = base64.b64decode(clip.base64_data)
+            pdf_filename = f"{sno}.mp4"
+            file_path = os.path.join("api/videos_clip/",pdf_filename)
+            base_url = request.base_url
+            pdf_return_path = f"{base_url.scheme}://{base_url.netloc}/{file_path}"
+
+            # Save the video file
+            with open(file_path, "wb") as video_file:
+                video_file.write(video_data)
+
+            # Append the saved file path to the response data
+            saved_clips.append({"file_path": pdf_return_path})
+
+        return saved_clips
