@@ -108,8 +108,8 @@ async def login(from_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @app.post("/signup")
-async def signup(me: UserCreate):
-    # , current_user: User = Depends(get_current_admin)
+async def signup(me: UserCreate, current_user: User = Depends(get_current_hr_access)):
+    
     password = get_password(me.password)
     user = User(email=me.email, password=password, roles=me.roles, department=me.department,Active_Status="Active")
     user.save()
@@ -128,19 +128,15 @@ class VideoClipResponse(BaseModel):
 async def upload_video_clip(file: UploadFile = File(...),issue_type:str=File(...)):
     content = await file.read()
     base64_data = base64.b64encode(content).decode('utf-8')
-    video_clip = VideoClip(sno=VideoClip.objects.count()+1,base64_data=base64_data,isuue_type=issue_type)
-    video_clip.save()
+    video_clip = VideoClip(sno=VideoClip.objects.count()+1,base64_data=base64_data,isuue_type=issue_type).save()
     return {"message": "Video clip uploaded successfully."}
 import os
-
-VIDEO_CLIPS_FOLDER = "video_clips"
 
 @app.get("/video_clips/")
 async def get_video_clips(sno:int,request: Request):
     video_clips = VideoClip.objects(sno=sno)
     if video_clips:
         saved_clips = []
-        # Create the folder if it doesn't exist
         for clip in video_clips:
             # Decode Base64 data and save it as a video file
             video_data = base64.b64decode(clip.base64_data)
